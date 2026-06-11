@@ -22,9 +22,10 @@ import can
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 USB_PORT     = "COM10"
-BUS_TYPE   = "slcan"    # or "socketcan"
-CAN_BITRATE = 500000
-CAN_ID    = 0x0C       # 12 decimal
+BUS_TYPE     = "slcan"    # or "socketcan"
+CAN_BITRATE  = 500000
+CAN_ID_LIST  = [0x0C, 0x0D, 0x0E, 0x0F]
+CAN_ID_LIST_STR = [str(x) for x in CAN_ID_LIST]
 
 COUNTS_PER_REV  = 16384
 PLOT_HISTORY    = 200   # number of data points shown on the plots
@@ -59,13 +60,13 @@ class MotorInterface:
         self._lock = threading.Lock()
         self._pos_counts = 0
         self._speed_rpm  = 0
-        self._can_id = CAN_ID
+        self._can_id = CAN_ID_LIST[0]
         self._relative_command = False
 
         try:
             self._bus = can.Bus(interface=BUS_TYPE, channel="COM10", bitrate=CAN_BITRATE)
             # Start listener thread
-            self._listener = threading.Thread(target=self._listen_loop, args=[self._can_id], daemon=True)
+            self._listener = threading.Thread(target=self._listen_loop, daemon=True)
             self._listener.start()
         except Exception as e:
             print(f"CAN bus open failed ({e}).")
@@ -78,12 +79,12 @@ class MotorInterface:
         except Exception as e:
             print(f"CAN send error: {e}")
 
-    def _listen_loop(self, can_id):
+    def _listen_loop(self):
         """Background thread: parse incoming frames and update telemetry."""
         while True:
             try:
                 msg = self._bus.recv(timeout=1.0)
-                if msg is None or msg.arbitration_id != can_id:
+                if msg is None or msg.arbitration_id != self._can_id:
                     continue
                 d = msg.data
                 if len(d) < 2:
@@ -103,6 +104,9 @@ class MotorInterface:
                 pass
 
     # ── Public commands ───────────────────────────────────────────────────────
+    def set_can_id(self, can_id: int):
+        self._can_id = can_id
+
     def set_work_mode(self, mode: int = 0x05):
         """0x82 – SR_vFOC bus FOC mode (required before enable)."""
         self._send(build(self._can_id, [0x82, mode]))
@@ -205,15 +209,27 @@ def _telemetry_loop():
         time.sleep(POLL_INTERVAL)
 
 
-def on_enable_toggle(can_id):
+def on_can_id_select(sender):
+    new_can_id = int(dpg.get_value(sender))
+    motor.set_can_id(new_can_id)
+
+
+def on_enable_toggle(can_id: int):
     new_state = not motor.get_enable()
-    if new_state:
-        motor.set_work_mode(0x05)
-    motor.set_enable(new_state)
-    label = "Disable Motor" if new_state else "Enable Motor"
-    button_text_colour = (200, 60, 60, 255) if new_state else (60, 180, 60, 255)
+    previous_motor_id = motor.get_can_id()
+    for motor_id in CAN_ID_LIST:
+        motor.set_can_id(motor_id)
+        if new_state:
+            motor.set_work_mode(0x05)
+        motor.set_enable(new_state)
+    motor.set_can_id(previous_motor_id)
+    if len(CAN_ID_LIST) > 1:
+        label = "Disable Motors" if new_state else "Enable Motors"
+    else:
+        label = "Disable Motor" if new_state else "Enable Motor"
+    #button_text_colour = (200, 60, 60, 255) if new_state else (60, 180, 60, 255)
     dpg.set_item_label("enable_btn", label)
-    dpg.configure_item("enable_btn", **{"user_data": None}, color=button_text_colour)
+    dpg.configure_item("enable_btn", **{"user_data": None})
     dpg.bind_item_theme("enable_btn", "btn_red" if new_state else "btn_green")
     dpg.set_value("status_text", "● ENABLED" if new_state else "○ DISABLED")
     dpg.configure_item("status_text", color=(80, 220, 80) if new_state else (180, 180, 180))
@@ -296,27 +312,40 @@ def build_gui():
 
         dpg.bind_font(regular_font)
         dpg.add_text("MKS SERVO57D — CAN Dashboard", color=(130, 180, 255))
-        dpg.add_text(f"CAN ID: 0x{CAN_ID:02X} | {USB_PORT} ({BUS_TYPE})", color=(120, 120, 140))
+        dpg.add_text(f"CAN Module Port: {USB_PORT} ({BUS_TYPE})", color=(120, 120, 140))
         dpg.add_separator()
         dpg.add_spacer(height=6)
 
         # ── Top row: enable + live readouts ───────────────────────────────────
         with dpg.group(horizontal=True):
             # Enable/Disable button
-            with dpg.child_window(width=150, height=110, border=True, no_scrollbar=True):
+            with dpg.child_window(width=200, height=160, border=True, no_scrollbar=True):
                 dpg.add_spacer(height=2)
-                dpg.add_button(label="Enable Motor", tag="enable_btn",
+
+                dpg.add_button(label="Enable Motors" if len(CAN_ID_LIST) > 1 else "Enable Motor", tag="enable_btn",
                                width=130, height=40,
                                callback=on_enable_toggle)
                 dpg.bind_item_theme("enable_btn", "btn_green")
+
                 dpg.add_spacer(height=2)
+
                 dpg.add_text("○ DISABLED", tag="status_text",
                              color=(180, 180, 180))
 
             dpg.add_spacer(width=6)
 
             # Live readouts
-            with dpg.child_window(width=220, height=110, border=True):
+            with dpg.child_window(width=200, height=160, border=True):
+                with dpg.group(horizontal=True):
+                    dpg.add_text("CAN ID:", tag="can_id_text",
+                                 color=(180, 180, 180))
+
+                    dpg.add_combo(items=CAN_ID_LIST_STR, default_value=CAN_ID_LIST_STR[0],
+                                  callback=on_can_id_select,
+                                  width=80)
+
+                dpg.add_spacer(height=2)
+
                 with dpg.group(horizontal=True):
                     dpg.add_text("Position:", color=(130, 180, 255))
                     dpg.add_text("+0.00 °", tag="pos_readout",
@@ -332,40 +361,40 @@ def build_gui():
             dpg.add_spacer(width=6)
 
             # Jog controls
-            with dpg.child_window(width=510, height=160, border=True):
+            with dpg.child_window(width=400, height=160, border=True):
                 with dpg.group(horizontal=True):
                     with dpg.group():
                         with dpg.group(horizontal=True):
                             dpg.add_button(label="↑↓", tag="jog_cw", #▶▶
                                            width=70, height=40,
-                                           callback=lambda: on_jog(CAN_ID, +1.0))
+                                           callback=lambda: on_jog(motor.get_can_id(), +1.0))
                             dpg.bind_item_theme("jog_cw", "btn_move")
 
                             dpg.add_button(label="↓↑", tag="jog_ccw", #◀◀
                                            width=70, height=40,
-                                           callback=lambda: on_jog(CAN_ID, -1.0))
+                                           callback=lambda: on_jog(motor.get_can_id(), -1.0))
                             dpg.bind_item_theme("jog_ccw", "btn_move")
 
                         with dpg.group(horizontal=True):
                             dpg.add_button(label="▶▶", tag="abs_move",  # ◀◀
                                            width=70, height=40,
-                                           callback=lambda: on_absolute_move(CAN_ID))
+                                           callback=lambda: on_absolute_move(motor.get_can_id()))
                             dpg.bind_item_theme("abs_move", "btn_move")
 
                             dpg.add_button(label="■", tag="soft_stop",  # ▶▶
                                            width=70, height=40,
-                                           callback=lambda: on_soft_stop(CAN_ID))
+                                           callback=lambda: on_soft_stop(motor.get_can_id()))
                             dpg.bind_item_theme("soft_stop", "btn_move")
 
                         with dpg.group(horizontal=True):
                             dpg.add_button(label="⌂", tag="home",
                                            width=70, height=40,
-                                           callback=lambda: on_set_zero(CAN_ID))
+                                           callback=lambda: on_set_zero(motor.get_can_id()))
                             dpg.bind_item_theme("home", "btn_home")
 
                             dpg.add_button(label="■", tag="emergency_stop",
                                            width=70, height=40,
-                                           callback=lambda: on_emergency_stop(CAN_ID))
+                                           callback=lambda: on_emergency_stop(motor.get_can_id()))
                             dpg.bind_item_theme("emergency_stop", "btn_red")
 
                     dpg.add_spacer(width=6)
@@ -380,7 +409,7 @@ def build_gui():
                         with dpg.group(horizontal=True):
                             dpg.add_text("Dist °", color=(160,160,180))
                             dpg.add_input_float(tag="jog_distance",
-                                                default_value=45,
+                                                default_value=720,
                                                 min_value=-7200, max_value=7200,
                                                 step=45, width=150)
                         with dpg.group(horizontal=True):
