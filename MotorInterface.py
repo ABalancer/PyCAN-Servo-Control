@@ -242,8 +242,6 @@ class MotorInterface:
         if acceleration > self._max_mks_acceleration:
             acceleration = self._max_mks_acceleration
             print("Acceleration beyond limit was desired, clamped acceleration to: %d" % acceleration)
-        elif acceleration < 0:
-            acceleration = 1
 
         return degrees, speed_rpm, acceleration
 
@@ -445,8 +443,6 @@ class MotorInterface:
                 acceleration = angular_acceleration_to_byte(acceleration)
             if acceleration > self._max_mks_acceleration:
                 acceleration = self._max_mks_acceleration
-            elif acceleration <= 0:
-                acceleration = 1
         else:
             acceleration = self._max_mks_acceleration
 

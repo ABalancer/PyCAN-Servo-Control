@@ -1,0 +1,47 @@
+{
+    "X": {
+        "ID": {
+            "group": 14,
+            "nodes": null
+        },
+        "limits": {
+            "require_homing": true,
+            "min_position": 0.0,
+            "max_position": 570.0,
+            "velocity": 50,
+            "acceleration": 35
+        },
+        "encoder_counts": 16384,
+        "mm_per_revolution": 10
+    },
+    "Y": {
+        "ID": {
+            "group": 80,
+            "nodes": [12, 13]
+        },
+        "limits": {
+            "require_homing": true,
+            "min_position": 0.0,
+            "max_position": 570.0,
+            "velocity": 50,
+            "acceleration": 35
+        },
+        "encoder_counts": 16384,
+        "mm_per_revolution": 10
+    },
+    "Z": {
+        "ID": {
+            "group": 15,
+            "nodes": null
+        },
+        "limits": {
+            "require_homing": true,
+            "min_position": -219.0,
+            "max_position": 0.0,
+            "velocity": 135,
+            "acceleration": 100
+        },
+        "encoder_counts": 16384,
+        "mm_per_revolution": 4
+    }
+}

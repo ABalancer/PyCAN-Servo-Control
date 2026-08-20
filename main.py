@@ -18,7 +18,7 @@ import collections
 import dearpygui.dearpygui as dpg
 import colorsys
 from MotorSystem import MotorSystem
-
+import json
 
 '''todo
 Test with multiple motors
@@ -37,60 +37,6 @@ BUS_TYPE: str                      = "slcan" # or "socketcan"
 CAN_BITRATE: int                   = 500000  # default rate of SERVO57D
 PLOT_HISTORY: int                  = 200     # number of data points shown on the plots
 PLOT_UPDATE_FREQUENCY: float | int = 10.0      # FPS
-
-DEVICE_DICTIONARY = {
-    "X": {
-        "ID": {
-            "group": 0x0E,  # Group CAN address / CAN address of single node system
-            "nodes": None,  # The addresses of all CAN nodes if using multiple motors per axis
-        },
-
-        "limits": {
-            "require_homing": True,  # set true if axis requires homing
-            "min_position":   0.0,   # rotor position (mm) = scaling * max_degrees / 360
-            "max_position":   570.0,
-            "velocity":       50,    # mm/s
-            "acceleration":   35,    # mm/s^2
-            # "current":
-        },
-        "encoder_counts":    16384,  # encoder counts per revolution
-        "mm_per_revolution": 10,     # mm per 360 degree revolution
-    },
-    "Y": {
-        "ID": {
-            "group": 0x50,          # Group CAN address / CAN address of single node system
-            "nodes": [0x0C, 0x0D],  # The addresses of all CAN nodes if using multiple motors per axis
-        },
-
-        "limits": {
-            "require_homing": True,  # set true if axis requires homing
-            "min_position":   0.0,   # rotor position (mm) = scaling * max_degrees / 360
-            "max_position":   570.0,
-            "velocity":       50,    # mm/s
-            "acceleration":   35,    # mm/s^2
-            # "current":
-        },
-        "encoder_counts":    16384,  # encoder counts per revolution
-        "mm_per_revolution": 10,     # mm per 360 degree revolution
-    },
-    "Z": {
-        "ID": {
-            "group": 0x0F,  # Group CAN address / CAN address of single node system
-            "nodes": None,  # The addresses of all CAN nodes if using multiple motors per axis
-        },
-
-        "limits": {
-            "require_homing": True,  # set true if axis requires homing
-            "min_position":   -219.0,  # rotor position (mm) = scaling * max_degrees / 360
-            "max_position":   0.0,
-            "velocity":       135,  # mm/s
-            "acceleration":   100,  # mm/s^2
-            # "current":
-        },
-        "encoder_counts":    16384,  # encoder counts per revolution
-        "mm_per_revolution": 4,      # mm per 360 degree revolution
-    },
-}
 
 
 class Stream:
@@ -540,6 +486,8 @@ class SystemGUI:
 
 
 if __name__ == "__main__":
-    system = MotorSystem(DEVICE_DICTIONARY, BUS_TYPE, USB_PORT, CAN_BITRATE)
+    with open("device_config.json", "r") as f:
+        device_dictionary: dict[str, dict] = json.load(f)
+    system = MotorSystem(device_dictionary, BUS_TYPE, USB_PORT, CAN_BITRATE)
     gui = SystemGUI(system)
     gui.start_loop()

@@ -25,10 +25,14 @@ def rpm_to_speed_bytes(speed_rpm: int) -> list[int]:
 # Conversions
 def angular_acceleration_to_byte(angular_acceleration: float) -> int:
     acceleration_mks = math.floor(256.0 - (2000.0 * math.pi / (3.0 * angular_acceleration)))
+    if acceleration_mks < 1:
+        acceleration_mks = 1
     return acceleration_mks
 
 def linear_acceleration_to_byte(linear_acceleration:float, mm_per_revolution: float) -> int:
     acceleration_mks = math.floor(256.0 - ((1000.0 * mm_per_revolution) / (3.0 * linear_acceleration)))
+    if acceleration_mks < 1:
+        acceleration_mks = 1
     return acceleration_mks
 
 def mks_acceleration_to_angular_acceleration(acceleration_mks: int) -> float:
