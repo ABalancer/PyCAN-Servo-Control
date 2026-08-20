@@ -341,7 +341,7 @@ class SystemGUI:
         for key in self._motor_system.get_system_keys():
             self._motor_system.set_active_axis(key)
             self._motor_system.get_active_axis_object().on_homed(lambda h: self._set_buttons_enabled_state(h))
-            self._motor_system.get_active_axis_object().on_position(lambda pos:self._streams[key].append(pos))
+            self._motor_system.get_active_axis_object().on_position(lambda pos, k=key: self._streams[key].append(pos))
 
         self._set_enable_button_colour(self._motor_system.get_system_enabled())
         self._set_buttons_enabled_state()
